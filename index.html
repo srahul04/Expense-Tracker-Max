@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0f766e">
+<title>Expense tracker Max</title>
+<style>
+:root{--bg:#f1f4f6;--cd:#fff;--tx:#14202b;--mu:#667585;--ac:#0f766e;--bd:#e1e7ec;--h:15,118,110;--wr:#b45309;--sh:0 2px 14px rgba(20,32,43,.06)}
+@media(prefers-color-scheme:dark){:root{--bg:#0d1217;--cd:#161d25;--tx:#e6eaee;--mu:#93a1af;--ac:#2dd4bf;--bd:#26303a;--h:45,212,191;--wr:#fbbf24;--sh:none}}
+*{box-sizing:border-box}
+body{margin:0 auto;font:17px/1.5 system-ui,sans-serif;background:var(--bg);color:var(--tx);max-width:720px;padding:0 20px 130px}
+header{display:flex;justify-content:space-between;align-items:center;padding:34px 2px 24px;gap:12px}
+header b{font-size:28px;letter-spacing:-.4px}header .mu{margin-top:2px}
+.pill{background:var(--cd);border:1px solid var(--bd);border-radius:99px;padding:10px 18px;font-size:15px;font-weight:600;white-space:nowrap;box-shadow:var(--sh)}
+.card{background:var(--cd);border:1px solid var(--bd);border-radius:22px;padding:26px;margin-bottom:22px;box-shadow:var(--sh)}
+.card>*:last-child{margin-bottom:0}
+h3{margin:0 0 18px;font-size:19px;font-weight:700}
+.mu{color:var(--mu);font-size:14px}
+.hero{background:linear-gradient(135deg,#0f766e,#155e75);color:#fff;border:0;display:flex;gap:16px;text-align:left;padding:30px}
+.hero>div{flex:1}.hero .mu{color:#cdeceb;font-size:15px}.big{font-size:34px;font-weight:800;letter-spacing:-.5px;line-height:1.2;margin:4px 0}
+nav{position:fixed;bottom:0;left:0;right:0;max-width:720px;margin:auto;display:flex;background:var(--cd);border-top:1px solid var(--bd);padding:8px 8px calc(8px + env(safe-area-inset-bottom,0px))}
+nav button{flex:1;padding:8px 0;border:0;background:none;color:var(--mu);font-size:13px;line-height:1.3;border-radius:14px}
+nav button.on{color:var(--ac);font-weight:700;background:rgba(var(--h),.1)}
+input,select,textarea,.b{font:inherit;color:var(--tx);background:var(--bg);border:1px solid var(--bd);border-radius:14px;padding:16px 18px;width:100%;min-height:56px}
+textarea{line-height:1.5;resize:vertical}input:focus,textarea:focus,select:focus{outline:2px solid var(--ac);border-color:transparent}
+.b{background:var(--ac);color:#fff;border:0;font-weight:700;cursor:pointer;text-align:center}.b.s{background:var(--bg);color:var(--tx);border:1px solid var(--bd)}
+.g2{display:flex;gap:12px;margin:14px 0}.g2>*{flex:1;min-width:0}.g2>.b[style*="width"]{flex:0 0 auto}
+input+input,textarea+.g2,.chips+input,input+.b,input+.g2,.b+.mu,.b+input,.mu+.b{margin-top:14px}
+.chips{display:flex;flex-wrap:wrap;gap:10px;margin:16px 0}
+.chip{padding:11px 18px;border-radius:99px;border:1px solid var(--bd);background:var(--bg);color:var(--tx);font-size:15px;cursor:pointer}
+.chip.on{background:var(--ac);color:#fff;border-color:var(--ac);font-weight:600}
+.row{display:flex;justify-content:space-between;align-items:center;padding:16px 0;border-bottom:1px solid var(--bd);gap:14px}.row:last-child{border:0}
+.row>div:last-child,.row>span:last-child{text-align:right;flex:none}
+.x{border:0;background:none;color:var(--mu);font-size:24px;cursor:pointer;padding:0 6px}
+label{display:flex;gap:14px;align-items:center;flex:1}label input{width:26px;height:26px;min-height:0;padding:0;flex:none;accent-color:var(--ac)}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-top:8px}.dn{text-align:center;font-size:13px;color:var(--mu);padding-bottom:4px}
+.day{min-height:62px;border-radius:12px;padding:7px 8px;font-size:12px;border:1px solid var(--bd);cursor:pointer;display:flex;flex-direction:column;justify-content:space-between}
+.day b{font-size:15px}.day.sel{outline:3px solid var(--ac);outline-offset:1px}
+.bar{height:12px;background:var(--ac);border-radius:6px;margin:8px 0}.warn{border-color:var(--wr);color:var(--wr);display:flex;justify-content:space-between;align-items:center}
+</style></head><body>
+<header><div><b>Expense tracker Max</b><div class="mu" id="hd"></div></div><div class="pill" id="rate"></div></header>
+<main id="m"></main>
+<nav id="nv"></nav>
+<script>
+const $=s=>document.querySelector(s),z=n=>String(n).padStart(2,'0'),fd=d=>d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate()),TD=()=>fd(new Date());
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+// ---------- IndexedDB ----------
+const DB=new Promise((ok,no)=>{const r=indexedDB.open('twlife',1);r.onupgradeneeded=()=>{['tx','log','notes','meta'].forEach(s=>r.result.createObjectStore(s,{keyPath:s=='notes'?'d':s=='meta'?'k':'id'}))};r.onsuccess=()=>ok(r.result);r.onerror=no});
+const st=(s,m)=>DB.then(d=>d.transaction(s,m||'readonly').objectStore(s));
+const put=(s,v)=>st(s,'readwrite').then(o=>o.put(v)),del=(s,k)=>st(s,'readwrite').then(o=>o.delete(k)),clr=s=>st(s,'readwrite').then(o=>o.clear());
+const all=s=>st(s).then(o=>new Promise(ok=>{const q=o.getAll();q.onsuccess=()=>ok(q.result)}));
+// ---------- data ----------
+const DEFC={Food:['Breakfast','Lunch','Dinner','Groceries','Drinks/Snacks'],Essentials:['Toiletries','Household','Laundry'],Skincare:[],Documents:['Visa/ARC','Printing','Insurance'],Class:['Books','Supplies'],Exams:['Fees','Materials'],Transport:['Bus/MRT','Scooter/YouBike','Travel'],Phone:[],Health:['Clinic','Medicine'],Misc:[]};
+let TX=[],LOG=[],NOTES={},CFG={cats:DEFC,items:[],rate:{v:2.8,date:'default'},budget:0,gm:'llama-3.3-70b-versatile',wm:'whisper-large-v3-turbo',key:'',lastBackup:''};
+let TAB='today',cat='Food',sub='',SEL=TD(),VM=new Date(),AIT='',PEND=null,FD='',MSG='';VM.setDate(1);
+const saveCfg=()=>put('meta',{k:'cfg',v:CFG});
+const SEED=('d|Food|Drink enough water;d|Study|Check tomorrow\'s classes & assignments;d|Money|Log today\'s expenses;'+
+'w|Food|Grocery run (fruit, eggs, rice, veg);w|Home|Laundry;w|Home|Take out trash/recycling on collection day;w|Home|Call or message family;w|Study|Review the week\'s lectures;w|Transport|Check EasyCard/iPASS balance;w|Health|Exercise;'+
+'m|Money|Pay rent & utilities;m|Money|Monthly budget review;m|Phone|Renew SIM/phone plan;m|Money|Family money transfer & bank charges check;m|Skincare|Restock skincare & toiletries;m|Study|Read department announcements;'+
+'s|Study|Course registration / add-drop;s|Study|Meet advisor or lab;s|Exams|Check exam schedule & rooms;s|Money|Pay tuition/fees;s|Documents|Check housing contract;'+
+'y|Documents|Check ARC validity & visa extension;y|Documents|Check health insurance (NHI) status;y|Documents|Passport validity;'+
+'y|Weather|Typhoon kit: water, torch, power bank, food|6-10;y|Weather|Winter: warm clothes, dehumidify room|12-2;y|Food|Stock up before Lunar New Year closures|1-2;'+
+'o|Documents|Confirm ARC received;o|Money|Open Taiwan bank account;o|Phone|Local SIM set up;o|Transport|EasyCard/iPASS and YouBike registered;o|Health|Register NHI and locate nearest clinic;o|Home|Save emergency numbers (110 police, 119 fire/ambulance) & university office contacts')
+.split(';').map(x=>{const[f,c,t,m]=x.split('|');return{f,c,t,mo:m?m.split('-').map(Number):null}});
+const IV={d:1,w:7,m:30,s:120,y:365,o:1e5},FL={d:'Daily',w:'Weekly',m:'Monthly',s:'Each semester',y:'Yearly / seasonal',o:'One-time setup'};
+const items=()=>SEED.concat(CFG.items);
+const last=t=>LOG.reduce((l,x)=>x.item==t&&x.d>l?x.d:l,'');
+function due(i,t){if(i.mo){const m=+t.slice(5,7),[a,b]=i.mo;if(a<=b?(m<a||m>b):(m<a&&m>b))return false}const l=last(i.t);if(!l)return true;if(i.f=='o')return false;return(new Date(t)-new Date(l))/864e5>=IV[i.f]}
+const sum=f=>TX.filter(f).reduce((a,t)=>a+t.a,0),nt=v=>'NT$'+Math.round(v).toLocaleString(),inr=v=>'₹'+Math.round(v*CFG.rate.v).toLocaleString();
+const uid=()=>Date.now()*1000+Math.floor(Math.random()*1000);
+function addTx(o){const t={id:uid(),d:o.d||TD(),a:+o.a,c:o.c,s:o.s||'',n:o.n||'',r:CFG.rate.v,src:o.src||'manual',ts:new Date().toISOString()};TX.push(t);put('tx',t)}
+function setDone(item,d){if(!LOG.some(x=>x.item==item&&x.d==d)){const l={id:uid(),item,d};LOG.push(l);put('log',l)}}
+function unDone(item,d){LOG.filter(x=>x.item==item&&x.d==d).forEach(x=>del('log',x.id));LOG=LOG.filter(x=>!(x.item==item&&x.d==d))}
+// ---------- views ----------
+const chk=(i,k)=>`<div class="row"><label><input type="checkbox" data-a="tick" data-i="${k}" ${last(i.t)==TD()?'checked':''}> ${esc(i.t)}</label><span class="mu">${i.c}</span></div>`;
+const entries=l=>l.length?l.map(t=>`<div class="row"><div><b>${esc(t.c)}${t.s?' · '+esc(t.s):''}</b><div class="mu">${esc(t.n)}${t.src=='ai'?' · AI':''}</div></div><div>${nt(t.a)} <button class="x" data-a="del" data-id="${t.id}">×</button></div></div>`).join(''):'<div class="mu">Nothing yet.</div>';
+const chips=(a,cur,act)=>`<div class="chips">${a.map(x=>`<button class="chip ${x==cur?'on':''}" data-a="${act}" data-v="${esc(x)}">${esc(x)}</button>`).join('')}</div>`;
+function pend(){if(!PEND)return'';const p=PEND;return`<div class="card" style="margin:8px 0 0"><h3>Review</h3>${p.entries.map(e=>`<div class="row"><span>${e.d} · ${esc(e.c)}${e.s?'/'+esc(e.s):''} ${esc(e.n)}</span><b>${nt(e.a)}</b></div>`).join('')}${p.done.length?`<div class="mu">Tick: ${p.done.map(esc).join('; ')}</div>`:''}${p.note?`<div class="mu">Diary: ${esc(p.note)}</div>`:''}<div class="g2"><button class="b" data-a="apply">Save all</button><button class="b s" data-a="discard">Discard</button></div></div>`}
+const V={
+today(){const t=TD(),k=items().map((i,k)=>[i,k]).filter(([i])=>due(i,t)),bk=(!CFG.lastBackup||(new Date(t)-new Date(CFG.lastBackup))/864e5>7)?'<div class="card warn">Backup due. <button class="chip" data-a="backup">Back up now</button></div>':'';
+return`${bk}<div class="card hero"><div><div class="mu">TODAY</div><div class="big">${nt(sum(x=>x.d==t))}</div><div class="mu">${inr(sum(x=>x.d==t))}</div></div><div><div class="mu">THIS MONTH</div><div class="big">${nt(sum(x=>x.d.startsWith(t.slice(0,7))))}</div><div class="mu">${inr(sum(x=>x.d.startsWith(t.slice(0,7))))}</div></div></div>
+<div class="card"><h3>Tell me about your day</h3><textarea id="ai" rows="3" placeholder="lunch 95, bubble tea 60, shampoo 180, did laundry. Felt tired today.">${esc(AIT)}</textarea><div class="g2"><button class="b" data-a="ask">Parse with AI</button><button class="b s" data-a="mic" id="mic">🎤 Voice</button></div><div class="mu" id="ms">${esc(MSG)}</div>${pend()}</div>
+<div class="card"><h3>Manual add</h3><div class="g2"><input id="amt" type="number" inputmode="decimal" placeholder="NT$"><input id="dt" type="date" value="${FD||t}"></div>${chips(Object.keys(CFG.cats),cat,'cat')}${chips(CFG.cats[cat]||[],sub,'sub')}<input id="nn" placeholder="Note" style="margin-bottom:8px"><button class="b" data-a="save">Save</button></div>
+<div class="card"><h3>Today's entries</h3>${entries(TX.filter(x=>x.d==t))}</div>
+<div class="card"><h3>Due now (${k.length})</h3>${k.slice(0,8).map(([i,x])=>chk(i,x)).join('')||'<div class="mu">All clear.</div>'}</div>`},
+cal(){const y=VM.getFullYear(),m=VM.getMonth(),n=new Date(y,m+1,0).getDate(),p=y+'-'+z(m+1),tot={},dn={};TX.forEach(t=>{if(t.d.startsWith(p))tot[t.d]=(tot[t.d]||0)+t.a});LOG.forEach(l=>{if(l.d.startsWith(p))dn[l.d]=(dn[l.d]||0)+1});const mx=Math.max(1,...Object.values(tot));
+let h=['S','M','T','W','T','F','S'].map(x=>`<div class="dn">${x}</div>`).join('')+'<div></div>'.repeat(VM.getDay());
+for(let i=1;i<=n;i++){const k=p+'-'+z(i),v=tot[k]||0;h+=`<div class="day ${k==SEL?'sel':''}" data-a="day" data-v="${k}" style="background:${v?`rgba(var(--h),${.15+.7*v/mx})`:'transparent'}"><b>${i}</b><span>${v?Math.round(v):''}${dn[k]?' ✓'+dn[k]:''}</span></div>`}
+return`<div class="card"><div class="g2" style="align-items:center"><button class="b s" style="width:50px" data-a="pm">‹</button><div style="flex:1;text-align:center;font-weight:700">${VM.toLocaleString('en',{month:'long',year:'numeric'})}</div><button class="b s" style="width:50px" data-a="nm">›</button></div><div class="grid">${h}</div><div class="mu">Number = NT$ spent, ✓ = checklist items done</div></div>
+<div class="card"><h3>${SEL} · ${nt(sum(x=>x.d==SEL))} (${inr(sum(x=>x.d==SEL))})</h3>${entries(TX.filter(x=>x.d==SEL))}<div class="mu" style="margin-top:8px">Done: ${esc(LOG.filter(l=>l.d==SEL).map(l=>l.item).join('; ')||'none')}</div><button class="chip" data-a="addon">+ Add expense on this day</button></div>
+<div class="card"><h3>Diary for ${SEL}</h3><textarea id="dn" rows="3" placeholder="Anything worth remembering...">${esc(NOTES[SEL]||'')}</textarea><button class="b" style="margin-top:8px" data-a="sn">Save note</button></div>`},
+lists(){const t=TD(),its=items().map((i,k)=>[i,k]);let h='';for(const f of Object.keys(FL)){const g=its.filter(([i])=>i.f==f&&(!i.mo||due({...i,f:'d'},t)||true));if(g.length)h+=`<div class="card"><h3>${FL[f]}</h3>${g.map(([i,k])=>{const d=due(i,t),l=last(i.t);return`<div class="row"><label><input type="checkbox" data-a="tick" data-i="${k}" ${l==t?'checked':''}> <span ${d||l==t?'':'style="opacity:.5"'}>${esc(i.t)}</span></label><span class="mu">${l?'last '+l:'never'}${i.mo?' · seasonal':''}</span></div>`}).join('')}</div>`}
+return h+`<div class="card"><h3>Add your own item</h3><input id="ni" placeholder="e.g. Buy bus pass"><div class="g2"><select id="nf">${Object.entries(FL).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select><button class="b" data-a="addi">Add</button></div></div>`},
+ins(){const t=TD(),p=t.slice(0,7),mt=sum(x=>x.d.startsWith(p)),dim=new Date(+t.slice(0,4),+t.slice(5,7),0).getDate(),dp=+t.slice(8),bc={};
+TX.filter(x=>x.d.startsWith(p)).forEach(x=>{const o=bc[x.c]=bc[x.c]||{t:0,s:{}};o.t+=x.a;const k=x.s||'other';o.s[k]=(o.s[k]||0)+x.a});
+const ms=[];for(let i=5;i>=0;i--){const d=new Date();d.setDate(1);d.setMonth(d.getMonth()-i);const k=fd(d).slice(0,7);ms.push([k,sum(x=>x.d.startsWith(k))])}const mx=Math.max(1,...ms.map(a=>a[1]));
+return`<div class="card"><h3>Budget (NT$ / month)</h3><input id="bud" type="number" inputmode="decimal" value="${CFG.budget||''}" placeholder="e.g. 20000"><div style="margin-top:8px">${CFG.budget?`Left <b>${nt(CFG.budget-mt)}</b> · Daily allowance <b>${nt(Math.max(0,(CFG.budget-mt)/Math.max(1,dim-dp+1)))}</b>`:'<span class="mu">Set a budget for a daily allowance.</span>'}</div></div>
+<div class="card"><h3>Last 6 months</h3>${ms.map(([k,v])=>`<div class="row"><span style="width:70px">${k}</span><div style="flex:1"><div class="bar" style="width:${100*v/mx}%"></div></div><span>${nt(v)}</span></div>`).join('')}</div>
+<div class="card"><h3>This month by category</h3>${Object.entries(bc).sort((a,b)=>b[1].t-a[1].t).map(([c,o])=>`<div style="margin-bottom:10px"><div class="row" style="border:0;padding:0"><b>${esc(c)}</b><span>${nt(o.t)} · ${inr(o.t)}</span></div><div class="bar" style="width:${100*o.t/mt}%"></div><div class="mu">${Object.entries(o.s).map(([s,v])=>esc(s)+' '+Math.round(v)).join(' · ')}</div></div>`).join('')||'<div class="mu">No data yet.</div>'}</div>`},
+more(){return`<div class="card"><h3>Exchange rate</h3><div class="g2"><input id="mr" type="number" step="0.0001" placeholder="Manual INR per 1 TWD"><button class="b s" style="width:80px" data-a="setr">Set</button></div><button class="b s" data-a="ref">Refresh online</button><div class="mu">Last update: ${CFG.rate.date}. Each entry keeps the rate of its day.</div></div>
+<div class="card"><h3>Groq AI</h3><input id="gk" type="password" placeholder="Groq API key" value="${esc(CFG.key)}"><div class="g2"><input id="gm" value="${esc(CFG.gm)}"><input id="wm" value="${esc(CFG.wm)}"></div><button class="b" data-a="sk">Save</button><div class="mu">Key stays on this device only. Chat model and voice model names are editable if Groq renames them.</div></div>
+<div class="card"><h3>Backup & calendar</h3><button class="b" data-a="backup">Back up now (JSON, CSV, diary, calendar)</button><div class="mu" style="margin:6px 0">Desktop Chrome lets you pick a folder; phones save to Downloads. Open the .ics file to add reminders and daily spend to your phone calendar.</div><input type="file" id="imp" accept=".json"><div class="mu">Restore from a JSON backup (replaces current data).</div></div>
+<div class="card"><h3>Categories (Name: sub1, sub2)</h3><textarea id="ct" rows="8">${esc(Object.entries(CFG.cats).map(([c,s])=>c+(s.length?': '+s.join(', '):'')).join('\n'))}</textarea><button class="b" style="margin-top:8px" data-a="sc">Save categories</button></div>
+<div class="card"><h3>Search all history</h3><input id="q" placeholder="Search notes, categories, diary..."><div id="qr"></div></div>`}};
+const TABS={today:'<span style="font-size:24px">🏠</span><br>Today',cal:'<span style="font-size:24px">📅</span><br>Calendar',lists:'<span style="font-size:24px">✅</span><br>Lists',ins:'<span style="font-size:24px">📊</span><br>Insights',more:'<span style="font-size:24px">⚙️</span><br>More'};
+function draw(){$('#m').innerHTML=V[TAB]();$('#nv').innerHTML=Object.entries(TABS).map(([k,v])=>`<button data-a="go" data-v="${k}" class="${k==TAB?'on':''}">${v}</button>`).join('');$('#rate').textContent='1 NT$ = ₹'+CFG.rate.v.toFixed(3);$('#hd').textContent=new Date().toDateString()}
+// ---------- actions ----------
+const go=t=>{TAB=t;draw()};
+const act={go:d=>go(d.v),cat:d=>{cat=d.v;sub='';draw()},sub:d=>{sub=sub==d.v?'':d.v;draw()},
+save(){const a=parseFloat($('#amt').value);if(!(a>0))return;addTx({d:$('#dt').value,a,c:cat,s:sub,n:$('#nn').value.trim()});FD='';draw()},
+del:d=>{TX=TX.filter(x=>x.id!=d.id);del('tx',+d.id);draw()},
+tick:d=>{const i=items()[d.i],t=TD();last(i.t)==t?unDone(i.t,t):setDone(i.t,t);draw()},
+day:d=>{SEL=d.v;draw()},pm(){VM.setMonth(VM.getMonth()-1);draw()},nm(){VM.setMonth(VM.getMonth()+1);draw()},addon(){FD=SEL;go('today')},
+sn(){const t=$('#dn').value.trim();if(t){NOTES[SEL]=t;put('notes',{d:SEL,t})}else{delete NOTES[SEL];del('notes',SEL)}},
+addi(){const t=$('#ni').value.trim();if(!t)return;CFG.items.push({f:$('#nf').value,c:'Custom',t,mo:null});saveCfg();draw()},
+setr(){const v=parseFloat($('#mr').value);if(v>0){CFG.rate={v,date:TD()+' (manual)'};saveCfg();draw()}},ref:()=>fetchRate(true),
+sk(){CFG.key=$('#gk').value.trim();CFG.gm=$('#gm').value.trim();CFG.wm=$('#wm').value.trim();saveCfg()},
+sc(){const o={};$('#ct').value.split('\n').forEach(l=>{if(!l.trim())return;const[c,...r]=l.split(':');o[c.trim()]=r.join(':').split(',').map(x=>x.trim()).filter(Boolean)});if(Object.keys(o).length){CFG.cats=o;if(!o[cat])cat=Object.keys(o)[0];saveCfg()}},
+backup,ask,mic,discard(){PEND=null;draw()},
+apply(){const t=TD();PEND.entries.forEach(e=>addTx({...e,src:'ai'}));PEND.done.forEach(n=>setDone(n,t));if(PEND.note){NOTES[t]=(NOTES[t]?NOTES[t]+'\n':'')+PEND.note;put('notes',{d:t,t:NOTES[t]})}PEND=null;AIT='';MSG='Saved.';draw()}};
+document.onclick=e=>{const b=e.target.closest('[data-a]');if(b&&act[b.dataset.a])act[b.dataset.a](b.dataset)};
+document.oninput=e=>{if(e.target.id=='ai')AIT=e.target.value;if(e.target.id=='bud'){CFG.budget=+e.target.value||0;saveCfg()}if(e.target.id=='q'){const q=e.target.value.toLowerCase();$('#qr').innerHTML=q.length<2?'':entries(TX.filter(t=>(t.c+' '+t.s+' '+t.n+' '+t.d).toLowerCase().includes(q)).slice(-30))+Object.entries(NOTES).filter(([d,t])=>t.toLowerCase().includes(q)).map(([d,t])=>`<div class="row"><span>${d}: ${esc(t)}</span></div>`).join('')}};
+document.onchange=e=>{if(e.target.id=='imp')restore(e.target.files[0])};
+// ---------- rate ----------
+function fetchRate(f){if(!navigator.onLine)return;if(!f&&CFG.rate.date.slice(0,10)==TD())return;fetch('https://open.er-api.com/v6/latest/TWD').then(r=>r.json()).then(j=>{if(j.rates&&j.rates.INR){CFG.rate={v:j.rates.INR,date:TD()};saveCfg();draw()}}).catch(()=>{})}
+// ---------- Groq AI ----------
+const GQ='https://api.groq.com/openai/v1/';
+async function ask(){const txt=($('#ai')?.value||AIT).trim();AIT=txt;if(!txt)return;if(!CFG.key){MSG='Add your Groq key in More first.';return draw()}if(!navigator.onLine){MSG='AI needs internet. Use manual add.';return draw()}
+ MSG='Thinking...';draw();const t=TD();
+ const sys=`You convert a student's daily log in Taiwan into JSON. Today is ${t}. Default currency is TWD; use "INR" if rupees/₹/Rs are mentioned. Categories and subcategories: ${JSON.stringify(CFG.cats)}. Checklist items: ${JSON.stringify(items().map(i=>i.t))}. Return ONLY JSON: {"entries":[{"date":"YYYY-MM-DD","amount":number,"cur":"TWD|INR","category":"","sub":"","note":""}],"done":["exact checklist item text, only if clearly completed"],"note":"diary text or empty"}. Use only the listed categories and subcategories, choose the closest one, resolve words like yesterday to dates, never invent amounts.`;
+ try{const r=await fetch(GQ+'chat/completions',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+CFG.key},body:JSON.stringify({model:CFG.gm,temperature:0,response_format:{type:'json_object'},messages:[{role:'system',content:sys},{role:'user',content:txt}]})});
+ const j=await r.json();if(!r.ok)throw new Error(j.error?.message||r.status);const o=JSON.parse(j.choices[0].message.content),names=items().map(i=>i.t);
+ PEND={entries:(o.entries||[]).filter(e=>+e.amount>0).map(e=>({d:/^\d{4}-\d\d-\d\d$/.test(e.date)?e.date:t,a:Math.round((e.cur=='INR'?e.amount/CFG.rate.v:+e.amount)*100)/100,c:CFG.cats[e.category]?e.category:'Misc',s:(CFG.cats[e.category]||[]).includes(e.sub)?e.sub:'',n:e.note||''})),done:(o.done||[]).filter(n=>names.includes(n)),note:o.note||''};
+ MSG=PEND.entries.length||PEND.done.length||PEND.note?'Check and confirm:':'Nothing found.'}catch(e){MSG='AI error: '+e.message}draw()}
+let rec;
+async function mic(){if(rec&&rec.state=='recording'){rec.stop();return}if(!CFG.key){MSG='Add your Groq key in More first.';return draw()}
+ try{const s=await navigator.mediaDevices.getUserMedia({audio:true}),ch=[];rec=new MediaRecorder(s);rec.ondataavailable=e=>ch.push(e.data);
+ rec.onstop=async()=>{s.getTracks().forEach(t=>t.stop());$('#mic').textContent='🎤 Voice';$('#ms').textContent='Transcribing...';try{const f=new FormData(),ext=rec.mimeType.includes('mp4')?'m4a':'webm';f.append('file',new File(ch,'a.'+ext,{type:rec.mimeType}));f.append('model',CFG.wm);const r=await fetch(GQ+'audio/transcriptions',{method:'POST',headers:{Authorization:'Bearer '+CFG.key},body:f}),j=await r.json();if(!r.ok)throw new Error(j.error?.message||r.status);AIT=(AIT+' '+j.text).trim();await ask()}catch(e){MSG='Voice error: '+e.message;draw()}};
+ rec.start();$('#mic').textContent='⏹ Stop'}catch(e){MSG='Mic unavailable: '+e.message;draw()}}
+// ---------- export / backup ----------
+const q=s=>'"'+String(s).replace(/"/g,'""')+'"';
+function files(){const t=TD(),about='Taiwan Life Log backup. Amounts are in TWD; r = INR per 1 TWD on the day the entry was made. tx = expenses, log = checklist completions, notes = diary by date, cfg = settings (API key excluded).';
+ const j=JSON.stringify({_about:about,schema:2,exported:new Date().toISOString(),tx:TX,log:LOG,notes:NOTES,cfg:{...CFG,key:''}},null,1);
+ const csv='date,amount_twd,inr_rate,amount_inr,category,subcategory,note,source\n'+TX.slice().sort((a,b)=>a.d<b.d?-1:1).map(x=>[x.d,x.a,x.r,Math.round(x.a*x.r*100)/100,q(x.c),q(x.s),q(x.n),x.src].join(',')).join('\n');
+ const ds=[...new Set([...TX.map(x=>x.d),...LOG.map(x=>x.d),...Object.keys(NOTES)])].sort();
+ const diary='TAIWAN LIFE DIARY\n'+about+'\n\n'+ds.map(d=>{const a=TX.filter(x=>x.d==d),l=LOG.filter(x=>x.d==d);return d+' | spent NT$'+Math.round(a.reduce((s,x)=>s+x.a,0))+'\n'+a.map(x=>'  - '+x.c+(x.s?'/'+x.s:'')+' NT$'+x.a+' (about INR '+Math.round(x.a*x.r)+')'+(x.n?' '+x.n:'')).join('\n')+(l.length?'\n  Done: '+l.map(x=>x.item).join('; '):'')+(NOTES[d]?'\n  Note: '+NOTES[d]:'')}).join('\n\n');
+ const s=t.replace(/-/g,''),ev=(m,d,r)=>'BEGIN:VEVENT\r\nUID:'+encodeURIComponent(m+d).replace(/%/g,'')+'@twlife\r\nDTSTAMP:20260101T000000Z\r\n'+(d.length>8?'DTSTART:'+d:'DTSTART;VALUE=DATE:'+d)+'\r\nSUMMARY:'+m.replace(/[,;]/g,' ')+(r?'\r\nRRULE:'+r:'')+'\r\nEND:VEVENT';
+ const R={w:'FREQ=WEEKLY',m:'FREQ=MONTHLY',s:'FREQ=MONTHLY;INTERVAL=4',y:'FREQ=YEARLY'},E=[ev('Log expenses (5 min)',s+'T213000','FREQ=DAILY')];
+ items().forEach(i=>{if(R[i.f])E.push(ev(i.t,s,R[i.f]))});const by={};TX.forEach(x=>by[x.d]=(by[x.d]||0)+x.a);Object.entries(by).forEach(([d,v])=>E.push(ev('Spent NT$'+Math.round(v),d.replace(/-/g,''))));
+ return[['twlife-'+t+'.json',j],['twlife-'+t+'.csv',csv],['twlife-diary-'+t+'.txt',diary],['twlife-'+t+'.ics','BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//twlife//EN\r\n'+E.join('\r\n')+'\r\nEND:VCALENDAR']]}
+function dl(n,t){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t]));a.download=n;a.click()}
+async function backup(){const f=files();try{if(window.showDirectoryPicker){const d=await showDirectoryPicker({mode:'readwrite'});for(const[n,t]of f){const w=await(await d.getFileHandle(n,{create:true})).createWritable();await w.write(t);await w.close()}}else f.forEach(([n,t],i)=>setTimeout(()=>dl(n,t),i*400));CFG.lastBackup=TD();saveCfg();MSG='Backup saved.'}catch(e){MSG='Backup cancelled.'}draw()}
+async function restore(f){if(!f)return;try{const o=JSON.parse(await f.text());if(!o.tx)return;for(const s of['tx','log','notes'])await clr(s);TX=o.tx;LOG=o.log||[];NOTES=o.notes||{};TX.forEach(x=>put('tx',x));LOG.forEach(x=>put('log',x));Object.entries(NOTES).forEach(([d,t])=>put('notes',{d,t}));CFG={...CFG,...o.cfg,key:CFG.key};saveCfg();draw()}catch(e){}}
+// ---------- start ----------
+(async()=>{try{navigator.storage?.persist?.()}catch(e){}
+ TX=await all('tx');LOG=await all('log');(await all('notes')).forEach(n=>NOTES[n.d]=n.t);const c=(await all('meta')).find(m=>m.k=='cfg');
+ if(c)CFG={...CFG,...c.v};else{try{const o=JSON.parse(localStorage.getItem('twexp1'));if(o){CFG.cats=o.cats;CFG.rate=o.rate;CFG.budget=o.budget;o.tx.forEach(t=>addTx({d:t.d,a:t.a,c:t.c,s:t.s,n:t.n}))}}catch(e){}saveCfg()}
+ cat=Object.keys(CFG.cats)[0];draw();fetchRate();try{navigator.serviceWorker.register('sw.js')}catch(e){}})();
+</script></body></html>
